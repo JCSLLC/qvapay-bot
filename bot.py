@@ -1,150 +1,158 @@
+import os
+import time
+import requests
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    Application,
+    ApplicationBuilder,
     CommandHandler,
     CallbackQueryHandler,
     MessageHandler,
     ContextTypes,
-    filters
+    filters,
 )
 
-import os
+# 🔑 PON AQUÍ TU TOKEN O USA VARIABLE DE ENTORNO
+TOKEN = "8979177993:AAGPznJmT2xiRe3P35fHAZdRV4f4p0c0vws"
 
-# ====================================
-# 🔑 TOKEN
-# ====================================
-TOKEN = os.getenv("TOKEN") or "8979177993:AAGPznJmT2xiRe3P35fHAZdRV4f4p0c0vws
-"
+URL = "https://tasas.eltoque.com/v1/trmi"
 
-usuarios = {}
+# cache
+cache = {"data": None, "time": 0}
 
-# ====================================
-# 🚀 START
-# ====================================
+# estado usuario
+user_state = {}
+
+# histórico para flechas
+last_values = {}
+
+
+def get_data():
+    now = time.time()
+
+    if cache["data"] and now - cache["time"] < 30:
+        return cache["data"]
+
+    r = requests.get(URL, timeout=10)
+    data = r.json()
+
+    cache["data"] = data
+    cache["time"] = now
+
+    return data
+
+
+def trend(key, value):
+    old = last_values.get(key)
+    last_values[key] = value
+
+    if old is None:
+        return ""
+    if value > old:
+        return " 🔼"
+    if value < old:
+        return " 🔽"
+    return " ➖"
+
+
+def build_message(data):
+    usd = data["usd"]["median"]
+    eur = data["eur"]["median"]
+    mlc = data["mlc"]["median"]
+
+    cad = data.get("cad", {}).get("median", "N/A")
+    mxn = data.get("mxn", {}).get("median", "N/A")
+    cla = data.get("cla", {}).get("median", "N/A")
+    zelle = data.get("zelle", {}).get("median", "N/A")
+
+    usdt = data.get("usdt_trc20", {}).get("median", "N/A")
+    binance = data.get("binance", {}).get("median", "N/A")
+    trx = data.get("trx", {}).get("median", "N/A")
+    btc = data.get("btc", {}).get("median", "N/A")
+
+    return f"""💱 Tasa en tiempo real
+🕒 Actualizado ahora
+
+» Mercado:
+💵 USD ⇾ {usd} CUP{trend("usd", usd)}
+💶 EUR ⇾ {eur} CUP{trend("eur", eur)}
+🟢 MLC ⇾ {mlc} CUP{trend("mlc", mlc)}
+🇨🇦 CAD ⇾ {cad} CUP{trend("cad", cad)}
+🇲🇽 MXN ⇾ {mxn} CUP{trend("mxn", mxn)}
+💳 CLA ⇾ {cla} CUP{trend("cla", cla)}
+📲 Zelle ⇾ {zelle} CUP{trend("zelle", zelle)}
+
+» Criptos:
+💰 USDT ⇾ {usdt} CUP{trend("usdt", usdt)}
+📊 Binance ⇾ {binance} CUP{trend("binance", binance)}
+🔷 TRX ⇾ {trx} CUP{trend("trx", trx)}
+₿ BTC ⇾ {btc} CUP{trend("btc", btc)}
+"""
+
+
+def menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Actualizar", callback_data="update")],
+        [InlineKeyboardButton("💱 Convertir", callback_data="convert")]
+    ])
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = get_data()
+    await update.message.reply_text(build_message(data), reply_markup=menu())
 
-    keyboard = [
-        [InlineKeyboardButton("💸 Zelle", callback_data="zelle")],
-        [InlineKeyboardButton("🅿️ PayPal", callback_data="paypal")]
-    ]
 
-    await update.message.reply_text(
-        "🚀 *Calculadora QvaPay*\n\nSelecciona un método:",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-# ====================================
-# 🔘 BOTONES
-# ====================================
-async def botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
+async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    usuarios[query.from_user.id] = query.data
+    if query.data == "update":
+        data = get_data()
+        await query.edit_message_text(build_message(data), reply_markup=menu())
 
-    await query.message.reply_text(
-        f"✅ Método seleccionado: *{query.data.upper()}*\n\n💵 Envía el monto en USD:",
-        parse_mode="Markdown"
-    )
-
-# ====================================
-# 🧮 CALCULADORA
-# ====================================
-async def calcular(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.message.from_user.id
-
-    if user_id not in usuarios:
-        await update.message.reply_text("⚠️ Usa /start primero")
-        return
-
-    metodo = usuarios[user_id]
-
-    try:
-        monto = float(update.message.text)
-        tasa = 1
-
-        # ================= ZELLE =================
-        if metodo == "zelle":
-            if 1 <= monto <= 90:
-                tasa = 1.05
-            elif 100 <= monto <= 499:
-                tasa = 1.04
-            elif 500 <= monto <= 1000:
-                tasa = 1.03
-
-        # ================= PAYPAL ================
-        elif metodo == "paypal":
-            if 1 <= monto <= 90:
-                tasa = 1.10
-            elif 100 <= monto <= 499:
-                tasa = 1.08
-            elif 500 <= monto <= 1000:
-                tasa = 1.05
-
-        total = monto * tasa
-
-        keyboard = [
-            [InlineKeyboardButton("🔄 Nuevo cálculo", callback_data="reset")]
-        ]
-
-        await update.message.reply_text(
-            "📊 *RESULTADO*\n\n"
-            f"💵 Monto: ${monto:.2f}\n"
-            f"📈 Tasa: {tasa}\n"
-            f"💰 Total: ${total:.2f}",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+    elif query.data == "convert":
+        await query.edit_message_text(
+            "💱 Envía así:\n\nEjemplo:\n100 usd\n50 eur\n200 mlc",
+            reply_markup=menu()
         )
 
+
+async def convert(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message.text.lower().split()
+
+    if len(msg) != 2:
+        return await update.message.reply_text("Formato: 100 usd")
+
+    try:
+        amount = float(msg[0])
+        currency = msg[1]
     except:
-        await update.message.reply_text("❌ Envía un número válido")
+        return await update.message.reply_text("Error de formato")
 
-# ====================================
-# 🔄 RESET
-# ====================================
-async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = get_data()
 
-    query = update.callback_query
-    await query.answer()
+    rates = {
+        "usd": data["usd"]["median"],
+        "eur": data["eur"]["median"],
+        "mlc": data["mlc"]["median"],
+    }
 
-    keyboard = [
-        [InlineKeyboardButton("💸 Zelle", callback_data="zelle")],
-        [InlineKeyboardButton("🅿️ PayPal", callback_data="paypal")]
-    ]
+    if currency not in rates:
+        return await update.message.reply_text("Monedas: usd / eur / mlc")
 
-    await query.message.reply_text(
-        "🔄 Selecciona un método:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+    result = amount * rates[currency]
+
+    await update.message.reply_text(
+        f"💱 Conversión:\n"
+        f"{amount} {currency.upper()} = {result:.2f} CUP\n\n"
+        f"📊 Tasa: {rates[currency]}"
     )
 
-# ====================================
-# 🎮 CALLBACKS
-# ====================================
-async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    query = update.callback_query
+app = ApplicationBuilder().token(TOKEN).build()
 
-    if query.data == "reset":
-        await reset(update, context)
-    else:
-        await botones(update, context)
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CallbackQueryHandler(buttons))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, convert))
 
-# ====================================
-# ▶️ MAIN
-# ====================================
-def main():
-
-    app = Application.builder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(callbacks))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, calcular))
-
-    print("✅ Bot activo")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+app.run_polling()
