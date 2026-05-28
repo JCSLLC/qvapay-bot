@@ -8,7 +8,7 @@ from telegram.ext import (
     ContextTypes,
 )
 
-TOKEN = "TU_TOKEN_AQUI"
+TOKEN = "8979177993:AAGPznJmT2xiRe3P35fHAZdRV4f4p0c0vws"
 
 # Guardar método temporal
 usuarios = {}
