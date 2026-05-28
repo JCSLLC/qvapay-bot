@@ -1,1 +1,1 @@
-# 🤖 QvaPay Telegram Bot Bot de Telegram para calcular ventas de saldo QvaPay mediante: - 💸 Zelle - 🅿️ PayPal ## 🚀 Tarifas ### 💸 Zelle | Rango | Tasa | |------|------| | 1 - 90 | 1.05 | | 100 - 499 | 1.04 | | 500 - 1000 | 1.03 | ### 🅿️ PayPal | Rango | Tasa | |------|------| | 1 - 90 | 1.10 | | 100 - 499 | 1.08 | | 500 - 1000 | 1.05 | --- ## ▶️ Ejecutar localmente ```bash pip install -r requirements.txt python bot.py
+
