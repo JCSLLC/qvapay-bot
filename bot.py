@@ -3,158 +3,173 @@ from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
+    ContextTypes
 )
 
 import os
 
-# ====================================
-# 🔑 TOKEN (Railway o local)
-# ====================================
 TOKEN = os.getenv("TOKEN") or "8979177993:AAGPznJmT2xiRe3P35fHAZdRV4f4p0c0vws"
 
-# Guardar método por usuario
-usuarios = {}
+# =========================
+# MENÚ PRINCIPAL
+# =========================
+def menu_principal():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 Calculadora QvaPay", callback_data="calc")],
+        [InlineKeyboardButton("📂 Catálogo", callback_data="catalogo")],
+        [InlineKeyboardButton("ℹ️ Ayuda", callback_data="ayuda")]
+    ])
 
-# ====================================
-# 🚀 START
-# ====================================
+# =========================
+# CATÁLOGO
+# =========================
+def menu_catalogo():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("💸 Zelle", callback_data="zelle_info")],
+        [InlineKeyboardButton("🅿️ PayPal", callback_data="paypal_info")],
+        [InlineKeyboardButton("🔙 Volver", callback_data="inicio")]
+    ])
+
+# =========================
+# CALCULADORA MENU
+# =========================
+def menu_calc():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("💸 Zelle", callback_data="zelle")],
+        [InlineKeyboardButton("🅿️ PayPal", callback_data="paypal")],
+        [InlineKeyboardButton("🔙 Volver", callback_data="inicio")]
+    ])
+
+# =========================
+# START
+# =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    keyboard = [
-        [InlineKeyboardButton("💸 Zelle", callback_data="zelle")],
-        [InlineKeyboardButton("🅿️ PayPal", callback_data="paypal")]
-    ]
-
     await update.message.reply_text(
-        "🚀 *Calculadora QvaPay*\n\nSelecciona un método:",
+        "🚀 *Bienvenido al Bot*\n\nSelecciona una opción:",
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=menu_principal()
     )
 
-# ====================================
-# 🔘 BOTONES
-# ====================================
+# =========================
+# CALLBACKS
+# =========================
 async def botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
     await query.answer()
 
-    metodo = query.data
-    usuarios[query.from_user.id] = metodo
+    data = query.data
 
-    await query.message.reply_text(
-        f"✅ Método seleccionado: *{metodo.upper()}*\n\n💵 Envía el monto en USD:",
-        parse_mode="Markdown"
-    )
-
-# ====================================
-# 🧮 CALCULADORA
-# ====================================
-async def calcular(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.message.from_user.id
-
-    if user_id not in usuarios:
-        await update.message.reply_text("⚠️ Usa /start primero")
-        return
-
-    metodo = usuarios[user_id]
-
-    try:
-        monto = float(update.message.text)
-
-        tasa = 1
-
-        # ================= ZELLE =================
-        if metodo == "zelle":
-            if 1 <= monto <= 90:
-                tasa = 1.05
-            elif 100 <= monto <= 499:
-                tasa = 1.04
-            elif 500 <= monto <= 1000:
-                tasa = 1.03
-
-        # ================= PAYPAL ================
-        elif metodo == "paypal":
-            if 1 <= monto <= 90:
-                tasa = 1.10
-            elif 100 <= monto <= 499:
-                tasa = 1.08
-            elif 500 <= monto <= 1000:
-                tasa = 1.05
-
-        total = monto * tasa
-
-        keyboard = [
-            [InlineKeyboardButton("🔄 Nuevo cálculo", callback_data="reset")],
-            [
-                InlineKeyboardButton("💸 Zelle", callback_data="zelle"),
-                InlineKeyboardButton("🅿️ PayPal", callback_data="paypal")
-            ]
-        ]
-
-        await update.message.reply_text(
-            "📊 *RESULTADO*\n\n"
-            f"💵 Monto: ${monto:.2f}\n"
-            f"📈 Tasa: {tasa}\n"
-            f"💰 Total: ${total:.2f}",
+    # =========================
+    # MENU PRINCIPAL
+    # =========================
+    if data == "inicio":
+        await query.message.edit_text(
+            "🏠 *Menú Principal*",
             parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            reply_markup=menu_principal()
         )
 
-    except:
-        await update.message.reply_text("❌ Envía un número válido")
+    # =========================
+    # CATÁLOGO
+    # =========================
+    elif data == "catalogo":
+        await query.message.edit_text(
+            "📂 *Catálogo de métodos*",
+            parse_mode="Markdown",
+            reply_markup=menu_catalogo()
+        )
 
-# ====================================
-# 🔄 RESET
-# ====================================
-async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # =========================
+    # INFO ZELLE
+    # =========================
+    elif data == "zelle_info":
+        await query.message.edit_text(
+            "💸 *Zelle*\n\n"
+            "✔️ Transferencias rápidas\n"
+            "✔️ Tarifas desde 1.03 a 1.05\n\n"
+            "🔙 Regresa al catálogo",
+            parse_mode="Markdown",
+            reply_markup=menu_catalogo()
+        )
 
-    query = update.callback_query
-    await query.answer()
+    # =========================
+    # INFO PAYPAL
+    # =========================
+    elif data == "paypal_info":
+        await query.message.edit_text(
+            "🅿️ *PayPal*\n\n"
+            "✔️ Pagos internacionales\n"
+            "✔️ Tarifas desde 1.05 a 1.10\n\n"
+            "🔙 Regresa al catálogo",
+            parse_mode="Markdown",
+            reply_markup=menu_catalogo()
+        )
 
-    keyboard = [
-        [InlineKeyboardButton("💸 Zelle", callback_data="zelle")],
-        [InlineKeyboardButton("🅿️ PayPal", callback_data="paypal")]
-    ]
+    # =========================
+    # CALCULADORA MENU
+    # =========================
+    elif data == "calc":
+        await query.message.edit_text(
+            "📊 *Calculadora*\n\nSelecciona método:",
+            parse_mode="Markdown",
+            reply_markup=menu_calc()
+        )
 
-    await query.message.reply_text(
-        "🔄 Selecciona un método:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    # =========================
+    # ZELLE CALC
+    # =========================
+    elif data == "zelle":
+        await query.message.edit_text(
+            "💸 Envíame el monto en USD para Zelle:\n\n"
+            "Rangos:\n"
+            "1-90 = 1.05\n"
+            "100-499 = 1.04\n"
+            "500-1000 = 1.03",
+            reply_markup=menu_calc()
+        )
 
-# ====================================
-# 🎮 CALLBACK MANAGER
-# ====================================
-async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # =========================
+    # PAYPAL CALC
+    # =========================
+    elif data == "paypal":
+        await query.message.edit_text(
+            "🅿️ Envíame el monto en USD para PayPal:\n\n"
+            "Rangos:\n"
+            "1-90 = 1.10\n"
+            "100-499 = 1.08\n"
+            "500-1000 = 1.05",
+            reply_markup=menu_calc()
+        )
 
-    query = update.callback_query
+    # =========================
+    # AYUDA
+    # =========================
+    elif data == "ayuda":
+        await query.message.edit_text(
+            "ℹ️ *Ayuda*\n\n"
+            "Usa los botones para navegar el menú.\n"
+            "Selecciona cálculo o catálogo.",
+            parse_mode="Markdown",
+            reply_markup=menu_principal()
+        )
 
-    if query.data == "reset":
-        await reset(update, context)
-    else:
-        await botones(update, context)
-
-# ====================================
-# ▶️ MAIN
-# ====================================
+# =========================
+# MAIN
+# =========================
 def main():
 
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(callbacks))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, calcular))
+    app.add_handler(CallbackQueryHandler(botones))
 
-    print("✅ Bot activo")
-
+    print("Bot activo 🚀")
     app.run_polling()
 
-# ====================================
-# 🚀 RUN
-# ====================================
+# =========================
+# RUN
+# =========================
 if __name__ == "__main__":
     main()
